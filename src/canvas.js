@@ -10,7 +10,10 @@
 import * as utils from './utils.js';
 
 let ctx,canvasWidth,canvasHeight,gradient,analyserNode,audioData;
-
+const speedMult = 1 / 1000;
+let image = new Image();
+let doSpin = false;
+let spin = Math.PI
 
 function setupCanvas(canvasElement,analyserNodeRef){
 	// create drawing context
@@ -35,33 +38,39 @@ function draw(params={}){
 	// 2 - draw background
     ctx.save();
     ctx.fillStyle = "black";
-    ctx.globalAlpha = 0.1;
+    ctx.globalAlpha = 1;
     ctx.fillRect(0,0,canvasWidth,canvasHeight);
     ctx.restore();
-		
-    // 3 - draw gradient
-    if (params.showGradient){
-        ctx.save();
-        ctx.fillStyle = gradient;
-        ctx.globalAlpha = 0.3;
-        ctx.fillRect(0,0,canvasWidth,canvasHeight);
-        ctx.restore();
+
+    let avg = 0;
+    for (let i = 0; i < audioData.length; i++)
+    {
+        avg += audioData[i];
     }
+    avg /= audioData.length;
 	
 	// 4 - draw bars
     if(params.showBars){
         let barSpacing = 4, margin = 5;
         let screenWidthForBars = canvasWidth - (audioData.length * barSpacing) - margin * 2;
         let barWidth = screenWidthForBars / audioData.length;
-        let barHeight = 200, topSpacing = 100;
+        let barHeight = 75, topSpacing = 100, radius = 100;
+
+        radius = avg + 20; 
 
         ctx.save();
-        ctx.fillStyle = 'rgba(255,255,255,0.50)';
-        ctx.strokeStyle = 'rgba(0,0,0,0.50)';
-        // loop and draw
-        for (let i = 0; i < audioData.length; i++){
-            ctx.fillRect(margin + i * (barWidth + barSpacing),topSpacing + 256-audioData[i],barWidth,barHeight);
-            ctx.strokeRect(margin + i * (barWidth + barSpacing),topSpacing + 256-audioData[i],barWidth,barHeight);
+        ctx.fillStyle = 'rgb(46,26,71)';
+        ctx.strokeStyle = 'rgb(46,26,71)';
+        ctx.translate(canvasWidth / 2,canvasHeight / 2);
+        for (let i = 0; i < audioData.length; i++)
+        {
+            ctx.save();
+            ctx.rotate(spin);
+            ctx.rotate((i / audioData.length) * 2 * Math.PI);
+            ctx.translate(0,radius);
+            ctx.fillRect(0,0,barWidth,barHeight + audioData[i] / 4);
+            ctx.strokeRect(0,0,barWidth,barHeight + audioData[i] / 4);
+            ctx.restore();
         }
         ctx.restore();
     }
@@ -103,6 +112,18 @@ function draw(params={}){
             ctx.closePath();
             ctx.restore();
         }
+        ctx.restore();
+    }
+
+    if(params.showImage){
+        let radius = avg + 50;
+        ctx.save();
+        ctx.translate(canvasWidth / 2, canvasHeight / 2);
+        ctx.rotate(spin + Math.PI);
+        ctx.beginPath();
+        ctx.arc(0,0,radius,0,2*Math.PI,false);
+        ctx.clip();
+        ctx.drawImage(image,-radius,-radius,radius * 2,radius * 2);
         ctx.restore();
     }
 
@@ -148,6 +169,23 @@ function draw(params={}){
 	
     // D) copy image data back to canvas
     ctx.putImageData(imageData, 0, 0);
+
+    if (doSpin){
+        spin += 2 * Math.PI * speedMult;
+    }
 }
 
-export {setupCanvas,draw};
+function useImage(newImage){
+    image = new Image();
+    image.src = newImage;
+}
+
+function toggleSpin(value){
+    doSpin = value;
+}
+
+function resetSpin(){
+    spin = Math.PI;
+}
+
+export {setupCanvas,draw,useImage,toggleSpin,resetSpin};

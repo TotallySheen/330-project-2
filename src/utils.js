@@ -37,5 +37,16 @@ const makeColor = (red, green, blue, alpha = 1) => {
       }
       // .. and do nothing if the method is not supported
   };
+
+  const preloadImage = (url,callback) => {
+    let img = new Image();
+    img.src = url;
+    img.onload = _=>{
+        callback(img)
+    };
+    img.onerror = _=>{
+        console.log(`Image at url "${url}" wouldn't load! Check your URL!`);
+    };
+}
   
-  export {makeColor, getRandomColor, getLinearGradient, goFullscreen};
+  export {makeColor, getRandomColor, getLinearGradient, goFullscreen, preloadImage};

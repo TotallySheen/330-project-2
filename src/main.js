@@ -17,13 +17,15 @@ const DEFAULTS = Object.freeze({
 });
 
 const drawParams = {
-    showGradient    : true,
     showBars        : true,
-    showCircles     : true,
+    showImage       : true,
     showNoise       : false,
     showInvert      : false,
     showEmboss      : false
 }
+
+let selectedTrack = undefined,selectedImg = undefined;
+const reader = new FileReader();
 
 function init(){
     audio.setupWebaudio(DEFAULTS.sound1);
@@ -31,7 +33,13 @@ function init(){
 	console.log(`Testing utils.getRandomColor() import: ${utils.getRandomColor()}`);
 	let canvasElement = document.querySelector("canvas"); // hookup <canvas> element
     setupUI(canvasElement);
+    canvas.useImage(document.querySelector("#imgSelect").value);
     canvas.setupCanvas(canvasElement,audio.analyserNode);
+    // set the gain
+    audio.setVolume(localStorage.volume);
+    // update the label
+    volumeLabel.innerHTML = Math.round(localStorage.volume/2 * 100);
+    volumeSlider.value = localStorage.volume;
     loop();
 }
 
@@ -57,11 +65,13 @@ function setupUI(canvasElement){
         if (e.target.dataset.playing == "no"){
             // if track is paused, play it
             audio.playCurrentSound();
+            canvas.toggleSpin(true);
             e.target.dataset.playing = "yes";
         }
         else{
             // if track is playing, pause it
             audio.pauseCurrentSound();
+            canvas.toggleSpin(false);
             e.target.dataset.playing = "no";
         }
     }
@@ -71,41 +81,73 @@ function setupUI(canvasElement){
 
     // add .oninput event to slider
     volumeSlider.oninput = e => {
+        localStorage.volume = e.target.value;
+        
         // set the gain
-        audio.setVolume(e.target.value);
+        audio.setVolume(localStorage.volume);
         // update the label
-        volumeLabel.innerHTML = Math.round(e.target.value/2 * 100);
+        volumeLabel.innerHTML = Math.round(localStorage.volume/2 * 100);
     }
 
-    volumeSlider.dispatchEvent(new Event("input"));
 
     let trackSelect = document.querySelector("#trackSelect");
+    let trackCustom = document.querySelector("#trackCustom");
     // add .onchange event
+
+    trackCustom.onchange = e => {
+        selectedTrack = URL.createObjectURL(e.target.files[0]);
+        trackSelect.selectedIndex = 3;
+        trackSelect.dispatchEvent(new Event("change"));
+    }
+
     trackSelect.onchange = e => {
-        audio.loadSoundFile(e.target.value);
+        if (e.target.value == "custom"){
+            if (selectedTrack != undefined){
+                audio.loadSoundFile(selectedTrack);
+            }
+        }
+        else{
+            audio.loadSoundFile(e.target.value);
+        }
         // pause
         if (playButton.dataset.playing = "yes"){
             playButton.dispatchEvent(new MouseEvent("click"));
+            canvas.resetSpin();
+        }
+    }
+
+
+    let imgSelect = document.querySelector("#imgSelect");
+    let imgCustom = document.querySelector("#imgCustom");
+
+    imgCustom.onchange = e => {
+        selectedImg = URL.createObjectURL(e.target.files[0]);
+        imgSelect.selectedIndex = 3;
+        imgSelect.dispatchEvent(new Event("change"));
+    }
+
+    imgSelect.onchange = e => {
+        if (e.target.value == "custom"){
+            if (selectedImg != undefined){
+                canvas.useImage(selectedImg);
+            }
+        }
+        else{
+            canvas.useImage(e.target.value);
         }
     }
 
     // checkboxes
-    let gradientCB = document.querySelector("#gradientCB");
-    gradientCB.checked = true;
-    gradientCB.onchange = e => {
-        drawParams.showGradient = e.target.checked;
-        }
-
     let barsCB = document.querySelector("#barsCB");
     barsCB.checked = true;
     barsCB.onchange = e => {
         drawParams.showBars = e.target.checked;
         }
 
-    let circlesCB = document.querySelector("#circlesCB");
-    circlesCB.checked  = true;
-    circlesCB.onchange = e => {
-        drawParams.showCircles = e.target.checked;
+    let imageCB = document.querySelector("#imageCB");
+    imageCB.checked  = true;
+    imageCB.onchange = e => {
+        drawParams.showImage = e.target.checked;
         }
 
     let noiseCB = document.querySelector("#noiseCB");

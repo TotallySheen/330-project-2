@@ -1,6 +1,6 @@
 body {
-	background: #eeeeee;
-	font-family: tahoma, verdana, sans serif;
+	background: #999999;
+  font-family: tahoma, verdana, sans serif;
 }
 
 canvas {
@@ -39,4 +39,8 @@ button[data-playing="no"]:after{
 #fsButton{
   font-size: 1.2rem;
   width: 8rem;
+}
+
+label.prompt{
+  display:block;
 }
