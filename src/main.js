@@ -35,11 +35,14 @@ function init(){
     setupUI(canvasElement);
     canvas.useImage(document.querySelector("#imgSelect").value);
     canvas.setupCanvas(canvasElement,audio.analyserNode);
-    // set the gain
+    // set the stored gain
+    try{
     audio.setVolume(localStorage.volume);
     // update the label
     volumeLabel.innerHTML = Math.round(localStorage.volume/2 * 100);
     volumeSlider.value = localStorage.volume;
+    }
+    catch(err){}
     loop();
 }
 
