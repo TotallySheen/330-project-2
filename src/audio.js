@@ -68,9 +68,13 @@ function pauseCurrentSound(){
     element.pause();
 }
 
+function setLoop(value){
+    element.loop = value;
+}
+
 function setVolume(value){
     value = Number(value); // make sure that it's a Number rather than a String
     gainNode.gain.value = value;
 }
 
-export{audioCtx,setupWebaudio,playCurrentSound,pauseCurrentSound,setVolume,loadSoundFile,analyserNode};
+export{audioCtx,setLoop,setupWebaudio,playCurrentSound,pauseCurrentSound,setVolume,loadSoundFile,analyserNode};

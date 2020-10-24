@@ -9,7 +9,7 @@
 
 import * as utils from './utils.js';
 
-let ctx,canvasWidth,canvasHeight,gradient,analyserNode,audioData;
+let ctx,canvasWidth,canvasHeight,gradient,analyserNode,audioData,waveData;
 const speedMult = 1 / 1000;
 let image = new Image();
 let doSpin = false;
@@ -20,12 +20,11 @@ function setupCanvas(canvasElement,analyserNodeRef){
 	ctx = canvasElement.getContext("2d");
 	canvasWidth = canvasElement.width;
 	canvasHeight = canvasElement.height;
-	// create a gradient that runs top to bottom
-	gradient = utils.getLinearGradient(ctx,0,0,0,canvasHeight,[{percent:0,color:"lime"},{percent:.15,color:"green"},{percent:.3,color:"red"},{percent:1,color:"pink"}]);
 	// keep a reference to the analyser node
 	analyserNode = analyserNodeRef;
 	// this is the array where the analyser data will be stored
-	audioData = new Uint8Array(analyserNode.fftSize/2);
+    audioData = new Uint8Array(analyserNode.fftSize/2);
+    waveData = new Uint8Array(analyserNode.fftSize/2);
 }
 
 function draw(params={}){
@@ -33,7 +32,7 @@ function draw(params={}){
 	// notice these arrays are passed "by reference" 
 	analyserNode.getByteFrequencyData(audioData);
 	// OR
-	//analyserNode.getByteTimeDomainData(audioData); // waveform data
+	analyserNode.getByteTimeDomainData(waveData); // waveform data
 	
 	// 2 - draw background
     ctx.save();
@@ -48,7 +47,39 @@ function draw(params={}){
         avg += audioData[i];
     }
     avg /= audioData.length;
-	
+    
+    if(params.showWaves){
+        let radius = (avg + 30) * 2;
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = utils.getLinearGradient(ctx,0,0,0,canvasHeight,[{percent:0,color:"red"},{percent:.3,color:"orange"},{percent:.5,color:"yellow"},{percent:1,color:"lime"}]);
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, canvasHeight / 2,radius,0,2 * Math.PI)
+        ctx.clip();
+        ctx.beginPath();
+        let sliceWidth = canvasWidth / waveData.length;
+        let x = 0;
+        for (let i = 0; i < waveData.length; i++)
+        {
+            let v = waveData[i] / 128.0;
+            let y = v * canvasHeight / 2;
+            if (i==0){
+                ctx.moveTo(x,y);
+            }
+            else{
+                ctx.lineTo(x,y);
+            }
+            x+= sliceWidth;
+        }
+        ctx.lineTo(canvasWidth,canvasHeight/2);
+        ctx.lineTo(canvasWidth,canvasHeight);
+        ctx.lineTo(0,canvasHeight);
+        ctx.fill();
+        ctx.closePath();
+        ctx.restore();
+    }
+
 	// 4 - draw bars
     if(params.showBars){
         let barSpacing = 4, margin = 5;
@@ -70,46 +101,6 @@ function draw(params={}){
             ctx.translate(0,radius);
             ctx.fillRect(0,0,barWidth,barHeight + audioData[i] / 4);
             ctx.strokeRect(0,0,barWidth,barHeight + audioData[i] / 4);
-            ctx.restore();
-        }
-        ctx.restore();
-    }
-    
-	// 5 - draw circles
-	if(params.showCircles){
-        let maxRadius = canvasHeight / 4;
-        ctx.save();
-        ctx.globalAlpha = 0.5;
-        for (let i = 0; i < audioData.length; i++){
-            // redish
-            let percent = audioData[i] / 255;
-
-            let circleRadius = percent * maxRadius;
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.fillStyle = utils.makeColor(255, 111, 111, 0.34 - percent/3.0);
-            ctx.arc(canvasWidth/2, canvasHeight/2, circleRadius, 0, 2*Math.PI, false);
-            ctx.fill();
-            ctx.closePath();
-            ctx.restore();
-
-            // blueish
-            ctx.save();
-            ctx.beginPath();
-            ctx.fillStyle = utils.makeColor(0, 0, 255, 0.1 - percent/10.0);
-            ctx.arc(canvasWidth / 2, canvasHeight / 2, circleRadius * 1.5, 0, 2 * Math.PI, false);
-            ctx.fill();
-            ctx.closePath();
-            ctx.restore();
-
-            // yellowish
-            ctx.save();
-            ctx.beginPath();
-            ctx.fillStyle = utils.makeColor(200, 200, 0, 0.5 - percent/5.0);
-            ctx.arc(canvasWidth / 2, canvasHeight / 2, circleRadius * 0.5, 0, 2*Math.PI, false);
-            ctx.fill();
-            ctx.closePath();
             ctx.restore();
         }
         ctx.restore();

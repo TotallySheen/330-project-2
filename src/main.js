@@ -7,6 +7,7 @@
 // In this instance, we feel the code is more readable if written this way
 // If you want to re-write these as ES6 arrow functions, to be consistent with the other files, go ahead!
 
+import * as dat from './dat.gui.module.js';
 import * as utils from './utils.js';
 import * as audio from './audio.js';
 import * as canvas from './canvas.js';
@@ -16,16 +17,23 @@ const DEFAULTS = Object.freeze({
 	sound1  :  "media/New Adventure Theme.mp3"
 });
 
-const drawParams = {
+const params = {
     showBars        : true,
     showImage       : true,
+    showWaves       : true,
+    song            : "media/New Adventure Theme.mp3",
+    image           : "media/cd.png",
     showNoise       : false,
     showInvert      : false,
-    showEmboss      : false
+    showEmboss      : false,
+    playing         : false,
+    loopAudio       : false,
+    'play/pause'    : play,
+    fullscreen      : goFullscreen,
+    volume          : 50
 }
 
 let selectedTrack = undefined,selectedImg = undefined;
-const reader = new FileReader();
 
 function init(){
     audio.setupWebaudio(DEFAULTS.sound1);
@@ -33,151 +41,135 @@ function init(){
 	console.log(`Testing utils.getRandomColor() import: ${utils.getRandomColor()}`);
 	let canvasElement = document.querySelector("canvas"); // hookup <canvas> element
     setupUI(canvasElement);
-    canvas.useImage(document.querySelector("#imgSelect").value);
+    canvas.useImage(params.image);
     canvas.setupCanvas(canvasElement,audio.analyserNode);
-    // set the stored gain
-    try{
-    audio.setVolume(localStorage.volume);
-    // update the label
-    volumeLabel.innerHTML = Math.round(localStorage.volume/2 * 100);
-    volumeSlider.value = localStorage.volume;
-    }
-    catch(err){}
     loop();
 }
 
 function setupUI(canvasElement){
-    // A - hookup fullscreen button
-    const fsButton = document.querySelector("#fsButton");
+    
+    let gui = new dat.GUI();
+    let controls = gui.addFolder("Controls");
+    controls.add(params, 'play/pause');
+    controls.add(params, 'fullscreen');
+    // set the stored gain
+    try{
+        audio.setVolume(localStorage.volume/50);
+        params.volume = Math.round(localStorage.volume);
+        }
+    catch(err){}
+    let volumeController = controls.add(params, 'volume',0,100);
+    let loopController = controls.add(params, 'loopAudio');
+    controls.open();
+    let mainParams = gui.addFolder("Main Features");
+    mainParams.add(params, 'showBars');
+    mainParams.add(params, 'showImage');
+    mainParams.add(params, 'showWaves');
+    let files = gui.addFolder("Files");
+    let songController = files.add(params, 'song', {
+        'New Adventure Theme': "media/New Adventure Theme.mp3",
+        'Peanuts Theme': "media/Peanuts Theme.mp3",
+        'The Picard Song': "media/The Picard Song.mp3",
+        'Custom Song': "custom"});
+    let imgController = files.add(params, 'image', {
+        'CD':"media/cd.png",
+        'Peanuts':"media/peanuts.png",
+        'Picard':"media/picard.png",
+        'Custom Image':"custom"});
+    let bitmaps = gui.addFolder("Bitmap Effects");
+    bitmaps.add(params, 'showNoise');
+    bitmaps.add(params, 'showInvert');
+    bitmaps.add(params, 'showEmboss');
+    
+    loopController.onChange(function(value){
+        audio.setLoop(value);
+    });
+
+    volumeController.onChange(function(value){
+        localStorage.volume = value;
         
-    // add .onclick event to button
-    fsButton.onclick = e => {
-        console.log("init called");
-        utils.goFullscreen(canvasElement);
-    };
-
-    let playButton = document.querySelector("#playButton");
-    playButton.onclick = e => {
-        console.log(`audioCtx.state before = ${audio.audioCtx.state}`);
-
-        // check if context is in suspended state (autoplay policy)
-        if (audio.audioCtx.state == "suspended"){
-            audio.audioCtx.resume();
-        }
-        console.log(`audioCtx.state after = ${audio.audioCtx.state}`);
-        if (e.target.dataset.playing == "no"){
-            // if track is paused, play it
-            audio.playCurrentSound();
-            canvas.toggleSpin(true);
-            e.target.dataset.playing = "yes";
-        }
-        else{
-            // if track is playing, pause it
-            audio.pauseCurrentSound();
-            canvas.toggleSpin(false);
-            e.target.dataset.playing = "no";
-        }
-    }
-
-    let volumeSlider = document.querySelector("#volumeSlider");
-    let volumeLabel = document.querySelector("#volumeLabel");
-
-    // add .oninput event to slider
-    volumeSlider.oninput = e => {
-        localStorage.volume = e.target.value;
-        
-        // set the gain
-        audio.setVolume(localStorage.volume);
-        // update the label
-        volumeLabel.innerHTML = Math.round(localStorage.volume/2 * 100);
-    }
+        audio.setVolume(localStorage.volume/50);
+        params.volume = Math.round(localStorage.volume);
+    });
 
 
-    let trackSelect = document.querySelector("#trackSelect");
     let trackCustom = document.querySelector("#trackCustom");
     // add .onchange event
 
     trackCustom.onchange = e => {
         selectedTrack = URL.createObjectURL(e.target.files[0]);
-        trackSelect.selectedIndex = 3;
-        trackSelect.dispatchEvent(new Event("change"));
-    }
-
-    trackSelect.onchange = e => {
-        if (e.target.value == "custom"){
-            if (selectedTrack != undefined){
-                audio.loadSoundFile(selectedTrack);
-            }
-        }
-        else{
-            audio.loadSoundFile(e.target.value);
+        if (selectedTrack != undefined){
+            audio.loadSoundFile(selectedTrack);
         }
         // pause
-        if (playButton.dataset.playing = "yes"){
-            playButton.dispatchEvent(new MouseEvent("click"));
+        if (params.playing = true){
+            play();
             canvas.resetSpin();
         }
     }
 
+    songController.onChange(function(value) {
+        console.log(value);
+        if (value == "custom"){
+            trackCustom.click();
+        }
+        else{
+            audio.loadSoundFile(value);
+        }
+        // pause
+        if (params.playing = true){
+            play();
+            canvas.resetSpin();
+        }
+    });
 
-    let imgSelect = document.querySelector("#imgSelect");
+
     let imgCustom = document.querySelector("#imgCustom");
 
     imgCustom.onchange = e => {
         selectedImg = URL.createObjectURL(e.target.files[0]);
-        imgSelect.selectedIndex = 3;
-        imgSelect.dispatchEvent(new Event("change"));
+        if (selectedImg != undefined){
+            canvas.useImage(selectedImg);
+        }
     }
 
-    imgSelect.onchange = e => {
-        if (e.target.value == "custom"){
-            if (selectedImg != undefined){
-                canvas.useImage(selectedImg);
-            }
+    imgController.onChange(function(value) {
+        if (value == "custom"){
+            imgCustom.click();
         }
         else{
-            canvas.useImage(e.target.value);
+            canvas.useImage(value);
         }
-    }
-
-    // checkboxes
-    let barsCB = document.querySelector("#barsCB");
-    barsCB.checked = true;
-    barsCB.onchange = e => {
-        drawParams.showBars = e.target.checked;
-        }
-
-    let imageCB = document.querySelector("#imageCB");
-    imageCB.checked  = true;
-    imageCB.onchange = e => {
-        drawParams.showImage = e.target.checked;
-        }
-
-    let noiseCB = document.querySelector("#noiseCB");
-    noiseCB.checked = false;
-    noiseCB.onchange = e => {
-        drawParams.showNoise = e.target.checked;
-        }
-
-    let invertCB = document.querySelector("#invertCB");
-    invertCB.checked = false;
-    invertCB.onchange = e => {
-        drawParams.showInvert = e.target.checked;
-        }
-    
-    let embossCB = document.querySelector("#embossCB");
-    embossCB.checked = false;
-    embossCB.onchange = e => {
-        drawParams.showEmboss = e.target.checked;
-        }
-        
-	
+    });
 } // end setupUI
 
 function loop(){
     requestAnimationFrame(loop);
-    
-    canvas.draw(drawParams);
+    canvas.draw(params);
+}
+
+function play(){
+    // check if context is in suspended state (autoplay policy)
+    if (audio.audioCtx.state == "suspended"){
+        audio.audioCtx.resume();
+    }
+    if (params.playing == false){
+        // if track is paused, play it
+        audio.playCurrentSound();
+        canvas.toggleSpin(true);
+        params.playing = true;
+
+    }
+    else{
+        // if track is playing, pause it
+        audio.pauseCurrentSound();
+        canvas.toggleSpin(false);
+        params.playing = false;
+    }
+}
+
+function goFullscreen(){
+    utils.goFullscreen(document.querySelector("canvas"));
 }
 
 export {init};
