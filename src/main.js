@@ -1,33 +1,27 @@
-/*
-	main.js is primarily responsible for hooking up the UI to the rest of the application 
-	and setting up the main event loop
-*/
-
-// We will write the functions in this file in the traditional ES5 way
-// In this instance, we feel the code is more readable if written this way
-// If you want to re-write these as ES6 arrow functions, to be consistent with the other files, go ahead!
-
 import * as dat from './dat.gui.module.js';
 import * as utils from './utils.js';
 import * as audio from './audio.js';
 import * as canvas from './canvas.js';
-
-// 1 - here we are faking an enumeration
 const DEFAULTS = Object.freeze({
-	sound1  :  "media/New Adventure Theme.mp3"
+	sound1  :  "media/Into the Doldrums.mp3"
 });
 
 const params = {
     showBars        : true,
     showImage       : true,
     showWaves       : true,
-    song            : "media/New Adventure Theme.mp3",
+    showProgress    : true,
+    showBezier      : false,
+    song            : "media/Into the Doldrums.mp3",
     image           : "media/cd.png",
     showNoise       : false,
-    showInvert      : false,
+    noiseAmount     : 0.05,
     showEmboss      : false,
+    colorFilter     : 'none',
     playing         : false,
     loopAudio       : false,
+    pinch           : false,
+    peak            : false,
     'play/pause'    : play,
     fullscreen      : goFullscreen,
     volume          : 50
@@ -37,8 +31,6 @@ let selectedTrack = undefined,selectedImg = undefined;
 
 function init(){
     audio.setupWebaudio(DEFAULTS.sound1);
-    console.log("init called");
-	console.log(`Testing utils.getRandomColor() import: ${utils.getRandomColor()}`);
 	let canvasElement = document.querySelector("canvas"); // hookup <canvas> element
     setupUI(canvasElement);
     canvas.useImage(params.image);
@@ -65,25 +57,31 @@ function setupUI(canvasElement){
     mainParams.add(params, 'showBars');
     mainParams.add(params, 'showImage');
     mainParams.add(params, 'showWaves');
+    mainParams.add(params, 'showProgress');
+    mainParams.add(params, 'showBezier');
     let files = gui.addFolder("Files");
     let songController = files.add(params, 'song', {
-        'New Adventure Theme': "media/New Adventure Theme.mp3",
-        'Peanuts Theme': "media/Peanuts Theme.mp3",
-        'The Picard Song': "media/The Picard Song.mp3",
+        'Into the Doldrums': "media/Into the Doldrums.mp3",
+        'Intruder Alert': "media/Intruder Alert.mp3",
+        'Delfino Plaza': "media/Delfino Plaza.mp3",
         'Custom Song': "custom"});
     let imgController = files.add(params, 'image', {
         'CD':"media/cd.png",
-        'Peanuts':"media/peanuts.png",
-        'Picard':"media/picard.png",
+        'Risk of Rain 2':"media/ror2.jpg",
+        'Team Fortress 2':"media/tf2.jpg",
+        'Super Mario':"media/mario.jpg",
         'Custom Image':"custom"});
     let bitmaps = gui.addFolder("Bitmap Effects");
     bitmaps.add(params, 'showNoise');
-    bitmaps.add(params, 'showInvert');
+    bitmaps.add(params, 'noiseAmount',0,0.1);
     bitmaps.add(params, 'showEmboss');
-    
+    bitmaps.add(params, 'colorFilter', {'none':'none','invert':'invert','sepia':'sepia'});
     loopController.onChange(function(value){
         audio.setLoop(value);
     });
+    let audios = gui.addFolder("Audio Effects");
+    let pinch = audios.add(params, 'pinch');
+    let peak = audios.add(params, 'peak');
 
     volumeController.onChange(function(value){
         localStorage.volume = value;
@@ -141,11 +139,35 @@ function setupUI(canvasElement){
             canvas.useImage(value);
         }
     });
+
+    pinch.onChange(function(value){
+        params.pinch = value;
+        if (params.pinch){
+            audio.filter1.frequency.value = 1000;
+            audio.filter1.gain.value = 25;
+        }
+        else{
+            audio.filter1.frequency.value = 0;
+            audio.filter1.gain.value = 0;
+        }
+    });
+
+    peak.onChange(function(value){
+        params.peak = value;
+        if (params.peak){
+            audio.filter2.frequency.value = 1000;
+            audio.filter2.gain.value = 25;
+        }
+        else{
+            audio.filter2.frequency.value = 0;
+            audio.filter2.gain.value = 0;
+        }
+    });
 } // end setupUI
 
 function loop(){
     requestAnimationFrame(loop);
-    canvas.draw(params);
+    canvas.draw(params,audio.getProgress());
 }
 
 function play(){

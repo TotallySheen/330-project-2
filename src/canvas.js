@@ -13,7 +13,8 @@ let ctx,canvasWidth,canvasHeight,gradient,analyserNode,audioData,waveData;
 const speedMult = 1 / 1000;
 let image = new Image();
 let doSpin = false;
-let spin = Math.PI
+let spin = Math.PI;
+let progress = 0;
 
 function setupCanvas(canvasElement,analyserNodeRef){
 	// create drawing context
@@ -27,7 +28,7 @@ function setupCanvas(canvasElement,analyserNodeRef){
     waveData = new Uint8Array(analyserNode.fftSize/2);
 }
 
-function draw(params={}){
+function draw(params={},progress=0){
     // 1 - populate the audioData array with the frequency data from the analyserNode
 	// notice these arrays are passed "by reference" 
 	analyserNode.getByteFrequencyData(audioData);
@@ -41,6 +42,7 @@ function draw(params={}){
     ctx.fillRect(0,0,canvasWidth,canvasHeight);
     ctx.restore();
 
+
     let avg = 0;
     for (let i = 0; i < audioData.length; i++)
     {
@@ -48,6 +50,18 @@ function draw(params={}){
     }
     avg /= audioData.length;
     
+    // draw progress
+    if (params.showProgress)
+    {
+        ctx.save();
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(canvasWidth / 2, canvasHeight / 2,(avg + 35) * 2,-0.5 * Math.PI,-0.5 * Math.PI + (progress * 2 * Math.PI));
+        ctx.stroke();
+        ctx.restore();
+    }
+
     if(params.showWaves){
         let radius = (avg + 30) * 2;
         ctx.save();
@@ -57,25 +71,45 @@ function draw(params={}){
         ctx.beginPath();
         ctx.arc(canvasWidth / 2, canvasHeight / 2,radius,0,2 * Math.PI)
         ctx.clip();
-        ctx.beginPath();
-        let sliceWidth = canvasWidth / waveData.length;
-        let x = 0;
-        for (let i = 0; i < waveData.length; i++)
+        let sliceWidth = (2 * radius) / waveData.length;
+        let x = (canvasWidth / 2) - radius;
+        for (let i = 0; i < waveData.length; i+= 2)
         {
             let v = waveData[i] / 128.0;
-            let y = v * canvasHeight / 2;
-            if (i==0){
-                ctx.moveTo(x,y);
-            }
-            else{
-                ctx.lineTo(x,y);
-            }
-            x+= sliceWidth;
+            let y = v * radius;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x,(canvasHeight / 2), sliceWidth, -Math.abs(-radius + y));
+            ctx.rect(x,(canvasHeight / 2), sliceWidth,Math.abs(-radius + y));
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            x+= sliceWidth * 2;
         }
-        ctx.lineTo(canvasWidth,canvasHeight/2);
-        ctx.lineTo(canvasWidth,canvasHeight);
-        ctx.lineTo(0,canvasHeight);
-        ctx.fill();
+        ctx.restore();
+    }
+
+    if (params.showBezier && params.playing)
+    {
+        // drawing some interesting curves based on frequency and waveform
+        let radius = (avg + 30) * 2;
+        let sliceWidth = 2 * radius / audioData.length;
+        ctx.save();
+        ctx.globalAlpha = 0.2;
+        ctx.strokeStyle = "blue";
+        ctx.lineWidth = 3;
+        let start = {x: canvasWidth / 2, y: canvasHeight / 2 - radius};
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y)
+        for (let i = 0; i < audioData.length; i+= 4)
+        {
+            
+            let cp1 = {x: canvasWidth / 2 + 4 * audioData[i],y: canvasHeight / 2 - radius + (sliceWidth * (i + 1))};
+            let cp2 = {x: canvasWidth / 2 - 4 * waveData[i],y: canvasHeight / 2 - radius + (sliceWidth * (i + 2))};
+            let end = {x: canvasWidth / 2,y: canvasHeight / 2 - radius + (sliceWidth * (i + 3))};
+            ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x,cp2.y,end.x,end.y);
+        }
+        ctx.stroke();
         ctx.closePath();
         ctx.restore();
     }
@@ -85,13 +119,13 @@ function draw(params={}){
         let barSpacing = 4, margin = 5;
         let screenWidthForBars = canvasWidth - (audioData.length * barSpacing) - margin * 2;
         let barWidth = screenWidthForBars / audioData.length;
-        let barHeight = 75, topSpacing = 100, radius = 100;
+        let barHeight = 50, topSpacing = 100, radius = 100;
 
         radius = avg + 20; 
 
         ctx.save();
-        ctx.fillStyle = 'rgb(46,26,71)';
-        ctx.strokeStyle = 'rgb(46,26,71)';
+        ctx.fillStyle = 'darkslateblue';
+        ctx.strokeStyle = 'darkslateblue';
         ctx.translate(canvasWidth / 2,canvasHeight / 2);
         for (let i = 0; i < audioData.length; i++)
         {
@@ -108,13 +142,14 @@ function draw(params={}){
 
     if(params.showImage){
         let radius = avg + 50;
+        let imgDimension = Math.min(image.width, image.height);
         ctx.save();
         ctx.translate(canvasWidth / 2, canvasHeight / 2);
         ctx.rotate(spin + Math.PI);
         ctx.beginPath();
         ctx.arc(0,0,radius,0,2*Math.PI,false);
         ctx.clip();
-        ctx.drawImage(image,-radius,-radius,radius * 2,radius * 2);
+        ctx.drawImage(image,(image.width / 2) - (imgDimension / 2),(image.height / 2) - (imgDimension / 2),imgDimension,imgDimension, -radius,-radius,radius * 2,radius * 2);
         ctx.restore();
     }
 
@@ -135,7 +170,7 @@ function draw(params={}){
 	// B) Iterate through each pixel, stepping 4 elements at a time (which is the RGBA for 1 pixel)
     for (let i = 0; i < length; i += 4){
 		// C) randomly change every 20th pixel to red
-        if (params.showNoise && Math.random() < 0.05){
+        if (params.showNoise && Math.random() < params.noiseAmount){
 			// data[i] is the red channel
 			// data[i+1] is the green channel
 			// data[i+2] is the blue channel
@@ -143,7 +178,7 @@ function draw(params={}){
 			data[i] = data[i+1] = data[i+2] = 0; // zero out the red and green and blue channels
             data[i+2] = 255; // make the red channel 100% red
         } // end if
-        if (params.showInvert){
+        if (params.colorFilter == "invert"){
             let red = data[i], green = data[i+1], blue = data[i+2];
             data[i] = 255-red;
             data[i+1] = 255-green;
@@ -155,6 +190,20 @@ function draw(params={}){
         for (let i = 0; i < length; i++){
             if (i%4 == 3) continue; // skip alpha
             data[i] = 127 + 2*data[i] - data[i+4] - data [i+width*4];
+        }
+    }
+
+    if (params.colorFilter == "sepia"){
+        let density = 50;
+        let rIntensity = (172 * density + 255 * (100 - density)) / 25500;
+        let gIntensity = (122 * density + 255 * (100 - density)) / 25500;
+        let bIntensity = (51 * density + 255 * (100 - density)) / 25500;
+        for (let i = 0; i < data.length; i += 4) {
+            let luma = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+             
+            data[i] = Math.round(rIntensity * luma);
+            data[i+1] = Math.round(gIntensity * luma);
+            data[i+2] = Math.round(bIntensity * luma);
         }
     }
 	

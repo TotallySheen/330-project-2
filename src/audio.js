@@ -3,7 +3,7 @@ let audioCtx;
 
 // **These are "private" properties - these will NOT be visible outside of this module (i.e. file)**
 // 2 - WebAudio nodes that are part of our WebAudio audio routing graph
-let element, sourceNode, analyserNode, gainNode;
+let element, sourceNode, analyserNode, gainNode, filter1, filter2;
 
 // 3 - here we are faking an enumeration
 const DEFAULTS = Object.freeze({
@@ -50,8 +50,21 @@ function setupWebaudio(filePath){
     gainNode = audioCtx.createGain();
     gainNode.gain.value = DEFAULTS.gain;
 
+    filter1 = audioCtx.createBiquadFilter();
+    filter1.type = "notch";
+    filter1.frequency.value = 0;
+    filter1.gain.value = 0;
+
+    filter2 = audioCtx.createBiquadFilter();
+    filter2.type = "peaking";
+    filter1.frequency.value = 0;
+    filter2.gain.value = 0;
+
+
     // 8 - connect the nodes - we now have an audio graph
-    sourceNode.connect(analyserNode);
+    sourceNode.connect(filter1);
+    filter1.connect(filter2);
+    filter2.connect(analyserNode);
     analyserNode.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 }
@@ -77,4 +90,8 @@ function setVolume(value){
     gainNode.gain.value = value;
 }
 
-export{audioCtx,setLoop,setupWebaudio,playCurrentSound,pauseCurrentSound,setVolume,loadSoundFile,analyserNode};
+function getProgress(){
+    return element.currentTime / element.duration;
+}
+
+export{audioCtx,setLoop,setupWebaudio,playCurrentSound,pauseCurrentSound,setVolume,loadSoundFile,getProgress,analyserNode,filter1,filter2};

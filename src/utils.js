@@ -47,6 +47,6 @@ const makeColor = (red, green, blue, alpha = 1) => {
     img.onerror = _=>{
         console.log(`Image at url "${url}" wouldn't load! Check your URL!`);
     };
-}
+  };
   
   export {makeColor, getRandomColor, getLinearGradient, goFullscreen, preloadImage};
